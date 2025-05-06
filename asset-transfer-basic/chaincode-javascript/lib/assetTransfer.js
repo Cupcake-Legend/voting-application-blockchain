@@ -7,55 +7,65 @@
 'use strict';
 
 // Deterministic JSON.stringify()
-const stringify  = require('json-stringify-deterministic');
-const sortKeysRecursive  = require('sort-keys-recursive');
+const stringify = require('json-stringify-deterministic');
+const sortKeysRecursive = require('sort-keys-recursive');
 const { Contract } = require('fabric-contract-api');
 
 class AssetTransfer extends Contract {
-
     async InitLedger(ctx) {
         const assets = [
+            // Vote results and users are empty at the beginning to ensure that every transaction is stored in the blockchain . - darren
             {
-                ID: 'asset1',
-                Color: 'blue',
-                Size: 5,
-                Owner: 'Tomoko',
-                AppraisedValue: 300,
+                ID: 'TPS1',
+                Name: 'Rungkut',
+                TotalVoters: 100,
+                TotalVoted: 0,
+                ResultsImage: '',
+                VoteResults: {
+                    PaslonA: 0,
+                    PaslonB: 0,
+                },
+                Users: [],
+                docType: 'TPS',
             },
             {
-                ID: 'asset2',
-                Color: 'red',
-                Size: 5,
-                Owner: 'Brad',
-                AppraisedValue: 400,
+                ID: 'TPS2',
+                Name: 'Gubeng',
+                TotalVoters: 100,
+                TotalVoted: 0,
+                ResultsImage: '',
+                VoteResults: {
+                    PaslonA: 0,
+                    PaslonB: 0,
+                },
+                Users: [],
+                docType: 'TPS',
             },
             {
-                ID: 'asset3',
-                Color: 'green',
-                Size: 10,
-                Owner: 'Jin Soo',
-                AppraisedValue: 500,
+                ID: 'TPS3',
+                Name: 'Gunung Anyar',
+                TotalVoters: 100,
+                TotalVoted: 0,
+                ResultsImage: '',
+                VoteResults: {
+                    PaslonA: 0,
+                    PaslonB: 0,
+                },
+                Users: [],
+                docType: 'TPS',
             },
             {
-                ID: 'asset4',
-                Color: 'yellow',
-                Size: 10,
-                Owner: 'Max',
-                AppraisedValue: 600,
-            },
-            {
-                ID: 'asset5',
-                Color: 'black',
-                Size: 15,
-                Owner: 'Adriana',
-                AppraisedValue: 700,
-            },
-            {
-                ID: 'asset6',
-                Color: 'white',
-                Size: 15,
-                Owner: 'Michel',
-                AppraisedValue: 800,
+                ID: 'TPS4',
+                Name: 'Kenjeran',
+                TotalVoters: 100,
+                TotalVoted: 0,
+                ResultsImage: '',
+                VoteResults: {
+                    PaslonA: 0,
+                    PaslonB: 0,
+                },
+                Users: [],
+                docType: 'TPS',
             },
         ];
 
@@ -65,12 +75,15 @@ class AssetTransfer extends Contract {
             // use convetion of alphabetic order
             // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
             // when retrieving data, in any lang, the order of data will be the same and consequently also the corresonding hash
-            await ctx.stub.putState(asset.ID, Buffer.from(stringify(sortKeysRecursive(asset))));
+            await ctx.stub.putState(
+                asset.ID,
+                Buffer.from(stringify(sortKeysRecursive(asset)))
+            );
         }
     }
 
     // CreateAsset issues a new asset to the world state with given details.
-    async CreateAsset(ctx, id, color, size, owner, appraisedValue) {
+    async CreateAsset(ctx, id, name, totalVoters) {
         const exists = await this.AssetExists(ctx, id);
         if (exists) {
             throw new Error(`The asset ${id} already exists`);
@@ -78,13 +91,22 @@ class AssetTransfer extends Contract {
 
         const asset = {
             ID: id,
-            Color: color,
-            Size: Number(size),
-            Owner: owner,
-            AppraisedValue: Number(appraisedValue),
+            Name: name,
+            TotalVoters: Number(totalVoters),
+            TotalVoted: 0,
+            ResultsImage: '',
+            VoteResults: {
+                PaslonA: 0,
+                PaslonB: 0,
+            },
+            Users: [],
+            docType: 'TPS', //add docType : TPS to ensure document filtering is easier in the future -darren
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        await ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(asset))));
+        await ctx.stub.putState(
+            id,
+            Buffer.from(stringify(sortKeysRecursive(asset)))
+        );
         return JSON.stringify(asset);
     }
 
@@ -113,7 +135,10 @@ class AssetTransfer extends Contract {
             AppraisedValue: appraisedValue,
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        return ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(updatedAsset))));
+        return ctx.stub.putState(
+            id,
+            Buffer.from(stringify(sortKeysRecursive(updatedAsset)))
+        );
     }
 
     // DeleteAsset deletes an given asset from the world state.
@@ -138,7 +163,10 @@ class AssetTransfer extends Contract {
         const oldOwner = asset.Owner;
         asset.Owner = newOwner;
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        await ctx.stub.putState(id, Buffer.from(stringify(sortKeysRecursive(asset))));
+        await ctx.stub.putState(
+            id,
+            Buffer.from(stringify(sortKeysRecursive(asset)))
+        );
         return oldOwner;
     }
 
@@ -149,7 +177,9 @@ class AssetTransfer extends Contract {
         const iterator = await ctx.stub.getStateByRange('', '');
         let result = await iterator.next();
         while (!result.done) {
-            const strValue = Buffer.from(result.value.value.toString()).toString('utf8');
+            const strValue = Buffer.from(
+                result.value.value.toString()
+            ).toString('utf8');
             let record;
             try {
                 record = JSON.parse(strValue);
@@ -161,6 +191,39 @@ class AssetTransfer extends Contract {
             result = await iterator.next();
         }
         return JSON.stringify(allResults);
+    }
+
+    //NEW METHODS
+
+    async RegisterUsers(ctx, tpsId, userId, username) {
+        const tpsAsBytes = await ctx.stub.getState(tpsId);
+        if (!tpsAsBytes || tpsAsBytes.length === 0) {
+            throw new Error(`TPS with ID ${tpsId} does not exist`);
+        }
+
+        const tps = JSON.parse(tpsAsBytes.toString());
+
+        const userExists = tps.Users.some((user) => user.ID === userId);
+        if (userExists) {
+            throw new Error(
+                `User with ID ${userId} is already registered at this TPS`
+            );
+        }
+
+        // Create new user
+        const newUser = {
+            ID: userId,
+            Name: username,
+            HasVoted: false,
+        };
+
+        // Push to the Users array in TPS
+        tps.Users.push(newUser);
+
+        // Update TPS code
+        await ctx.stub.putState(tpsId, Buffer.from(JSON.stringify(tps)));
+
+        return JSON.stringify(newUser);
     }
 }
 
