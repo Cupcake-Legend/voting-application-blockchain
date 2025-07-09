@@ -75,7 +75,3 @@ Server runs on: [http://localhost:3000](http://localhost:3000)
   * Voters list with HasVoted flag
   * Vote results per Paslon
 * `InitLedger` is optional; data should be synced by Laravel seeder/API.
-
----
-
-````
