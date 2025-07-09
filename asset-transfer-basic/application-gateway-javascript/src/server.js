@@ -89,96 +89,81 @@ async function getContract() {
     return { contract, gateway, client };
 }
 
-// Endpoint: GET all assets
-app.get('/api/assets', async (req, res) => {
+//Init ledger
+app.post('/api/init', async (req, res) => {
+    try {
+        const { contract, gateway, client } = await getContract();
+        await contract.submitTransaction('InitLedger');
+        res.json({ message: 'Ledger initialized' });
+        gateway.close();
+        client.close();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+//Get all assets
+app.get('/api/tps', async (req, res) => {
     try {
         const { contract, gateway, client } = await getContract();
         const result = await contract.evaluateTransaction('GetAllAssets');
-        const json = JSON.parse(utf8Decoder.decode(result));
-        res.json(json);
+        res.json(JSON.parse(utf8Decoder.decode(result)));
         gateway.close();
         client.close();
     } catch (err) {
-        console.error('Failed to fetch assets:', err);
-        res.status(500).send('Failed to fetch assets');
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Create a new asset
-app.use(express.json()); //This is required to parse JSON body
-app.post('/api/assets', async (req, res) => {
-    const { assetId, color, size, owner, appraisedValue } = req.body;
 
-    if (!assetId || !color || !size || !owner || !appraisedValue) {
-        return res.status(400).json({ error: 'Missing required asset fields.' });
+//New TPS
+app.post('/api/tps', async (req, res) => {
+    const { id, name, totalVoters } = req.body;
+    if (!id || !name || !totalVoters) {
+        return res.status(400).json({ error: 'Missing TPS fields' });
+    }
+
+    try {
+        const { contract, gateway, client } = await getContract();
+        await contract.submitTransaction('CreateAsset', id, name, String(totalVoters));
+        res.json({ message: `TPS ${id} created` });
+        gateway.close();
+        client.close();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+//Register Users
+app.post('/api/register', async (req, res) => {
+    const { tpsId, userId, username } = req.body;
+    if (!tpsId || !userId || !username) {
+        return res.status(400).json({ error: 'Missing register user fields' });
+    }
+
+    try {
+        const { contract, gateway, client } = await getContract();
+        await contract.submitTransaction('RegisterUsers', tpsId, userId, username);
+        res.json({ message: `User ${userId} registered to TPS ${tpsId}` });
+        gateway.close();
+        client.close();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Cast a vote
+app.post('/api/vote', async (req, res) => {
+    const { tpsId, userId } = req.body;
+
+    if (!tpsId || !userId) {
+        return res.status(400).json({ error: 'Missing tpsId or userId' });
     }
 
     try {
         const { contract, gateway, client } = await getContract();
 
-        await contract.submitTransaction(
-            'CreateAsset',
-            assetId,
-            color,
-            size,
-            owner,
-            appraisedValue
-        );
-
-        res.json({ message: `Asset ${assetId} created successfully` });
-
-        gateway.close();
-        client.close();
-    } catch (err) {
-        console.error('Failed to create asset:', err);
-        res.status(500).json({ error: 'Failed to create asset: ' + err.message });
-    }
-});
-
-// Transfer asset
-app.post('/api/assets/transfer', async (req, res) => {
-    const { assetId, newOwner } = req.body;
-
-    if (!assetId || !newOwner) {
-        return res.status(400).json({ error: 'Missing assetId or newOwner in request body.' });
-    }
-
-    try {
-        const { contract, gateway, client } = await getContract();
-
-        const commit = await contract.submitAsync('TransferAsset', {
-            arguments: [assetId, newOwner],
-        });
-
-        const oldOwner = new TextDecoder().decode(commit.getResult());
-
-        const status = await commit.getStatus();
-        if (!status.successful) {
-            throw new Error(
-                `Transaction ${status.transactionId} failed with status code ${status.code}`
-            );
-        }
-
-        res.json({
-            message: `Asset ${assetId} ownership transferred from ${oldOwner} to ${newOwner}`,
-        });
-
-        gateway.close();
-        client.close();
-    } catch (err) {
-        console.error('Failed to transfer asset:', err);
-        res.status(500).json({ error: 'Failed to transfer asset: ' + err.message });
-    }
-});
-
-//Read asset
-app.get('/api/assets/:id', async (req, res) => {
-    const assetId = req.params.id;
-
-    try {
-        const { contract, gateway, client } = await getContract();
-
-        const resultBytes = await contract.evaluateTransaction('ReadAsset', assetId);
+        const resultBytes = await contract.submitTransaction('CastVote', tpsId, userId);
         const resultJson = new TextDecoder().decode(resultBytes);
         const result = JSON.parse(resultJson);
 
@@ -187,45 +172,33 @@ app.get('/api/assets/:id', async (req, res) => {
         gateway.close();
         client.close();
     } catch (err) {
-        console.error('Failed to read asset:', err);
-        res.status(500).json({ error: 'Failed to read asset: ' + err.message });
+        console.error('Failed to cast vote:', err);
+        res.status(500).json({ error: 'Failed to cast vote: ' + err.message });
     }
 });
 
-//Init Ledger
-app.post('/api/init', async (req, res) => {
+app.post('/api/vote-results', async (req, res) => {
+    const { tpsId, paslonA, paslonB } = req.body;
+    if (!tpsId || paslonA == null || paslonB == null) {
+        return res.status(400).json({ error: 'Missing fields' });
+    }
+
     try {
         const { contract, gateway, client } = await getContract();
 
-        console.log('➡️ Calling InitLedger...');
-        await contract.submitTransaction('InitLedger');
+        await contract.submitTransaction('UpdateVoteResults', tpsId, paslonA.toString(), paslonB.toString());
 
-        res.json({ message: 'Ledger initialized successfully' });
+        res.json({ message: 'Vote results updated' });
 
         gateway.close();
         client.close();
     } catch (err) {
-        console.error('Failed to initialize ledger:', err);
-        res.status(500).json({ error: 'Failed to initialize ledger: ' + err.message });
+        res.status(500).json({ error: err.message });
     }
 });
 
-//create student
-app.post('/api/students', async (req, res) => {
-    const { nrp, name, ipk, program_studi } = req.body;
 
-    try {
-        const { contract, gateway, client } = await getContract();
-        await contract.submitTransaction('CreateStudentAsset', nrp, name, ipk, program_studi);
-        res.status(200).json({ message: 'Student asset created successfully' });
 
-        gateway.close();
-        client.close();
-    } catch (error) {
-        console.error(`Failed to create student asset: ${error}`);
-        res.status(500).json({ error: 'Failed to create student asset' });
-    }
-});
 
 
 

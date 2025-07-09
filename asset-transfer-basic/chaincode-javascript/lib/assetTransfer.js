@@ -13,83 +13,43 @@ const { Contract } = require('fabric-contract-api');
 
 class AssetTransfer extends Contract {
     async InitLedger(ctx) {
-        const assets = [
-            // Vote results and users are empty at the beginning to ensure that every transaction is stored in the blockchain . - darren
-            {
-                ID: 'TPS1',
-                Name: 'Rungkut',
-                TotalVoters: 100,
-                TotalVoted: 0,
-                ResultsImage: '',
-                VoteResults: {
-                    PaslonA: 0,
-                    PaslonB: 0,
-                },
-                Users: [],
-                docType: 'TPS',
-            },
-            {
-                ID: 'TPS2',
-                Name: 'Gubeng',
-                TotalVoters: 100,
-                TotalVoted: 0,
-                ResultsImage: '',
-                VoteResults: {
-                    PaslonA: 0,
-                    PaslonB: 0,
-                },
-                Users: [],
-                docType: 'TPS',
-            },
-            {
-                ID: 'TPS3',
-                Name: 'Gunung Anyar',
-                TotalVoters: 100,
-                TotalVoted: 0,
-                ResultsImage: '',
-                VoteResults: {
-                    PaslonA: 0,
-                    PaslonB: 0,
-                },
-                Users: [],
-                docType: 'TPS',
-            },
-            {
-                ID: 'TPS4',
-                Name: 'Kenjeran',
-                TotalVoters: 100,
-                TotalVoted: 0,
-                ResultsImage: '',
-                VoteResults: {
-                    PaslonA: 0,
-                    PaslonB: 0,
-                },
-                Users: [],
-                docType: 'TPS',
-            },
+        const tpsList = [
+            { ID: 'TPS1', Name: 'Rungkut' },
+            { ID: 'TPS2', Name: 'Gubeng' },
+            { ID: 'TPS3', Name: 'Gunung Anyar' },
+            { ID: 'TPS4', Name: 'Kenjeran' },
         ];
 
-        for (const asset of assets) {
-            asset.docType = 'asset';
-            // example of how to write to world state deterministically
-            // use convetion of alphabetic order
-            // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-            // when retrieving data, in any lang, the order of data will be the same and consequently also the corresonding hash
+        for (const tps of tpsList) {
+            const newTPS = {
+                ID: tps.ID,
+                Name: tps.Name,
+                TotalVoters: 0, // can be incremented later via RegisterUsers
+                TotalVoted: 0,  // increment when votes are submitted
+                ResultsImage: '',
+                VoteResults: {
+                    PaslonA: 0,
+                    PaslonB: 0,
+                },
+                Users: [], // array of { ID, Name, HasVoted }
+                docType: 'TPS',
+            };
+
             await ctx.stub.putState(
-                asset.ID,
-                Buffer.from(stringify(sortKeysRecursive(asset)))
+                newTPS.ID,
+                Buffer.from(stringify(sortKeysRecursive(newTPS)))
             );
         }
     }
 
     // CreateAsset issues a new asset to the world state with given details.
-    async CreateAsset(ctx, id, name, totalVoters) {
+    async CreateAsset(ctx, id, name, totalVoters = 0) {
         const exists = await this.AssetExists(ctx, id);
         if (exists) {
-            throw new Error(`The asset ${id} already exists`);
+            throw new Error(`The TPS ${id} already exists`);
         }
 
-        const asset = {
+        const newTPS = {
             ID: id,
             Name: name,
             TotalVoters: Number(totalVoters),
@@ -100,15 +60,17 @@ class AssetTransfer extends Contract {
                 PaslonB: 0,
             },
             Users: [],
-            docType: 'TPS', //add docType : TPS to ensure document filtering is easier in the future -darren
+            docType: 'TPS',
         };
-        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
+
         await ctx.stub.putState(
             id,
-            Buffer.from(stringify(sortKeysRecursive(asset)))
+            Buffer.from(stringify(sortKeysRecursive(newTPS)))
         );
-        return JSON.stringify(asset);
+
+        return JSON.stringify(newTPS);
     }
+
 
     // ReadAsset returns the asset stored in the world state with given id.
     async ReadAsset(ctx, id) {
@@ -120,26 +82,27 @@ class AssetTransfer extends Contract {
     }
 
     // UpdateAsset updates an existing asset in the world state with provided parameters.
-    async UpdateAsset(ctx, id, color, size, owner, appraisedValue) {
+    async UpdateAsset(ctx, id, name, totalVoters, resultsImage) {
         const exists = await this.AssetExists(ctx, id);
         if (!exists) {
-            throw new Error(`The asset ${id} does not exist`);
+            throw new Error(`The TPS ${id} does not exist`);
         }
 
-        // overwriting original asset with new asset
-        const updatedAsset = {
-            ID: id,
-            Color: color,
-            Size: size,
-            Owner: owner,
-            AppraisedValue: appraisedValue,
-        };
-        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        return ctx.stub.putState(
+        const assetString = await this.ReadAsset(ctx, id);
+        const asset = JSON.parse(assetString);
+
+        asset.Name = name || asset.Name;
+        asset.TotalVoters = totalVoters !== undefined ? Number(totalVoters) : asset.TotalVoters;
+        asset.ResultsImage = resultsImage || asset.ResultsImage;
+
+        await ctx.stub.putState(
             id,
-            Buffer.from(stringify(sortKeysRecursive(updatedAsset)))
+            Buffer.from(stringify(sortKeysRecursive(asset)))
         );
+
+        return JSON.stringify(asset);
     }
+
 
     // DeleteAsset deletes an given asset from the world state.
     async DeleteAsset(ctx, id) {
@@ -225,6 +188,58 @@ class AssetTransfer extends Contract {
 
         return JSON.stringify(newUser);
     }
+
+    async CastVote(ctx, tpsId, userId) {
+        const tpsAsBytes = await ctx.stub.getState(tpsId);
+        if (!tpsAsBytes || tpsAsBytes.length === 0) {
+            throw new Error(`TPS with ID ${tpsId} does not exist`);
+        }
+
+        const tps = JSON.parse(tpsAsBytes.toString());
+
+        const userIndex = tps.Users.findIndex(user => user.ID === userId);
+        if (userIndex === -1) {
+            throw new Error(`User ${userId} is not registered in TPS ${tpsId}`);
+        }
+
+        if (tps.Users[userIndex].HasVoted) {
+            throw new Error(`User ${userId} has already voted`);
+        }
+
+        // Update user and TPS stats
+        tps.Users[userIndex].HasVoted = true;
+        tps.TotalVoted += 1;
+
+        // Optionally: increment vote result (hardcoded for example)
+        // tps.VoteResults.PaslonA += 1;
+
+        // Save updated TPS
+        await ctx.stub.putState(tpsId, Buffer.from(JSON.stringify(tps)));
+
+        return JSON.stringify({
+            message: `User ${userId} has voted at TPS ${tpsId}`,
+            TotalVoted: tps.TotalVoted
+        });
+    }
+
+    async UpdateVoteResults(ctx, tpsId, paslonA, paslonB) {
+        const tpsAsBytes = await ctx.stub.getState(tpsId);
+        if (!tpsAsBytes || tpsAsBytes.length === 0) {
+            throw new Error(`TPS ${tpsId} not found`);
+        }
+
+        const tps = JSON.parse(tpsAsBytes.toString());
+
+        tps.VoteResults = {
+            PaslonA: parseInt(paslonA),
+            PaslonB: parseInt(paslonB),
+        };
+
+        await ctx.stub.putState(tpsId, Buffer.from(JSON.stringify(tps)));
+        return JSON.stringify(tps);
+    }
+
+
 }
 
 module.exports = AssetTransfer;
