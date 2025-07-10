@@ -228,7 +228,15 @@ class AssetTransfer extends Contract {
             throw new Error(`TPS ${tpsId} not found`);
         }
 
+        const aVotes = parseInt(paslonA);
+        const bVotes = parseInt(paslonB);
+        const total = aVotes + bVotes;
+
         const tps = JSON.parse(tpsAsBytes.toString());
+
+        if (total > tps.TotalVoters) {
+            throw new Error(`Total votes (${total}) exceed max voters (${tps.TotalVoters}) for TPS ${tpsId}`);
+        }
 
         tps.VoteResults = {
             PaslonA: parseInt(paslonA),
