@@ -12,6 +12,7 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const utf8Decoder = new TextDecoder();
 
@@ -119,24 +120,30 @@ app.get('/api/tps', async (req, res) => {
 //New TPS
 app.post('/api/tps', async (req, res) => {
     const { id, name, totalVoters } = req.body;
-    if (!id || !name || !totalVoters) {
+
+    if (!id || !name || totalVoters === undefined) {
         return res.status(400).json({ error: 'Missing TPS fields' });
     }
 
     try {
+        console.log('➡️ Creating TPS in chaincode:', { id, name, totalVoters });
         const { contract, gateway, client } = await getContract();
-        await contract.submitTransaction('CreateAsset', id, name, String(totalVoters));
-        res.json({ message: `TPS ${id} created` });
+        const result = await contract.submitTransaction('CreateAsset', id, name, String(totalVoters));
+        console.log('Chaincode result:', result.toString());
+        res.json({ message: `TPS ${id} created`, result: result.toString() });
         gateway.close();
         client.close();
     } catch (err) {
+        console.error('Chaincode error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
+
 //Register Users
 app.post('/api/register', async (req, res) => {
     const { tpsId, userId, username } = req.body;
+    console.log('Received body:', req.body);
     if (!tpsId || !userId || !username) {
         return res.status(400).json({ error: 'Missing register user fields' });
     }
@@ -203,6 +210,6 @@ app.post('/api/vote-results', async (req, res) => {
 
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`REST API listening on http://localhost:${PORT}`);
 });

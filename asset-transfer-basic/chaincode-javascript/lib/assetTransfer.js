@@ -43,7 +43,7 @@ class AssetTransfer extends Contract {
     }
 
     // CreateAsset issues a new asset to the world state with given details.
-    async CreateAsset(ctx, id, name, totalVoters = 0) {
+    async CreateAsset(ctx, id, name, totalVoters) {
         const exists = await this.AssetExists(ctx, id);
         if (exists) {
             throw new Error(`The TPS ${id} already exists`);
