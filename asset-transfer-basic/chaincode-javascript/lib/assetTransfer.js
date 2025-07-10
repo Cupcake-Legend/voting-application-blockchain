@@ -234,8 +234,15 @@ class AssetTransfer extends Contract {
 
         const tps = JSON.parse(tpsAsBytes.toString());
 
+        const votedUsersCount = tps.Users.filter(user => user.HasVoted === true).length;
+
+
         if (total > tps.TotalVoters) {
             throw new Error(`Total votes (${total}) exceed max voters (${tps.TotalVoters}) for TPS ${tpsId}`);
+        }
+
+        if (total > votedUsersCount) {
+            throw new Error(`Total votes (${total}) exceed user that has voted:(${userArray}) for TPS ${tpsId}`);
         }
 
         tps.VoteResults = {
