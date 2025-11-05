@@ -1,34 +1,14 @@
-# Emacs backup files
-*~
-*#
-.#*
-# Vim file artifacts
-.*.sw*
-.DS_Store
-.project
-# omit Go vendor directories
-vendor/
-.vscode
-.gradle
-.idea
-# Dependency directories
-node_modules/
-package-lock.json
-# Ignore Gradle build output directory
-build
-# Ignore Maven build output directory
-target
+# Ignore everything
+*
 
-# Eclipse
-.classpath
-.settings
 
-# installed Fabric binaries etc.
-/bin/
-builders/
-config/
-external-chaincode/
-install-fabric.sh
+!.gitIgnore
+# Unignore parent directories so Git can reach the file
+!asset-transfer-basic/
+!asset-transfer-basic/application-gateway-javascript/
+!asset-transfer-basic/application-gateway-javascript/src/
+!asset-transfer-basic/application-gateway-javascript/src/server.js
 
-# override the ignore of all config/ folders
-!full-stack-asset-transfer-guide/infrastructure/sample-network/config
+!asset-transfer-basic/chaincode-javascript
+!asset-transfer-basic/chaincode-javascript/lib/
+!asset-transfer-basic/chaincode-javascript/lib/assetTransfer.js

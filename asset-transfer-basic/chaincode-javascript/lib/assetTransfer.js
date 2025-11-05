@@ -245,6 +245,10 @@ class AssetTransfer extends Contract {
             throw new Error(`Total votes (${total}) exceed user that has voted:(${userArray}) for TPS ${tpsId}`);
         }
 
+        if (total < votedUsersCount) {
+            throw new Error(`Total votes (${total}) is less than the user that has voted:(${userArray}) for TPS ${tpsId}`);
+        }
+
         tps.VoteResults = {
             PaslonA: parseInt(paslonA),
             PaslonB: parseInt(paslonB),
